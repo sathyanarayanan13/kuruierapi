@@ -1,0 +1,45 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String    @unique
+  mobileNumber  String    @unique
+  passwordHash  String
+  isVerified    Boolean   @default(false)
+  currentRole   UserRole  @default(SHIPMENT_OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  otpVerifications OtpVerification[]
+  roleHistory   UserRoleHistory[]
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid())
+  userId    String
+  otpCode   String
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model UserRoleHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  role      UserRole
+  setAt     DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum UserRole {
+  TRAVELLER
+  SHIPMENT_OWNER
+} 
