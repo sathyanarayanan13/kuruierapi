@@ -1,25 +1,20 @@
 import jwt from 'jsonwebtoken';
 import { ApiResponse } from './response';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'your-refresh-secret';
+
 export class JwtService {
-  private static accessSecret = process.env.JWT_ACCESS_SECRET || 'your-access-token-secret-key';
-  private static refreshSecret = process.env.JWT_REFRESH_SECRET || 'your-refresh-token-secret-key';
-  private static accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
-  private static refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
-
   static generateTokens(userId: string) {
-    // @ts-ignore
-    const accessToken = jwt.sign({ userId }, this.accessSecret, { expiresIn: this.accessExpiresIn });
-    // @ts-ignore
-    const refreshToken = jwt.sign({ userId }, this.refreshSecret, { expiresIn: this.refreshExpiresIn });
-
+    const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '1h' });
+    const refreshToken = jwt.sign({ userId }, REFRESH_SECRET, { expiresIn: '7d' });
     return { accessToken, refreshToken };
   }
 
   static verifyAccessToken(token: string) {
     try {
       // @ts-ignore
-      return jwt.verify(token, this.accessSecret);
+      return jwt.verify(token, JWT_SECRET);
     } catch (error) {
       throw ApiResponse.unauthorized('Invalid access token');
     }
@@ -28,14 +23,14 @@ export class JwtService {
   static verifyRefreshToken(token: string) {
     try {
       // @ts-ignore
-      return jwt.verify(token, this.refreshSecret);
+      return jwt.verify(token, REFRESH_SECRET);
     } catch (error) {
       throw ApiResponse.unauthorized('Invalid refresh token');
     }
   }
 
   static refreshTokens(refreshToken: string) {
-    const decoded = this.verifyRefreshToken(refreshToken);
-    return this.generateTokens((decoded as any).userId);
+    const decoded = this.verifyRefreshToken(refreshToken) as { userId: string };
+    return this.generateTokens(decoded.userId);
   }
 } 

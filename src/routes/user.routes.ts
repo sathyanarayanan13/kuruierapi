@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { UserController } from '../controllers/user.controller';
-import { authenticateToken, refreshTokenMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, refreshTokenMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -18,10 +18,10 @@ router.post('/v1/auth/refresh-token', refreshTokenMiddleware);
 
 // Profile routes
 // @ts-ignore
-router.get('/v1/profile', authenticateToken, UserController.getProfile);
+router.get('/v1/profile', authMiddleware, UserController.getProfile);
 // @ts-ignore
-router.put('/v1/profile', authenticateToken, UserController.updateProfile);
+router.put('/v1/profile', authMiddleware, UserController.updateProfile);
 // @ts-ignore
-router.put('/v1/profile/mobile', authenticateToken, UserController.updateMobileNumber);
+router.put('/v1/profile/mobile', authMiddleware, UserController.updateMobileNumber);
 
 export default router; 

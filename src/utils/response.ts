@@ -23,35 +23,19 @@ export class ApiResponse {
     };
   }
 
+  static serverError(message?: string) {
+    return this.error('Internal server error', 500);
+  }
+
+  static notFound(message: string = 'Resource not found') {
+    return this.error(message, 404);
+  }
+
   static unauthorized(message: string = 'Unauthorized') {
-    return {
-      success: false,
-      message,
-      statusCode: 401
-    };
+    return this.error(message, 401);
   }
 
   static forbidden(message: string = 'Forbidden') {
-    return {
-      success: false,
-      message,
-      statusCode: 403
-    };
-  }
-
-  static notFound(message: string = 'Not Found') {
-    return {
-      success: false,
-      message,
-      statusCode: 404
-    };
-  }
-
-  static serverError(message: string = 'Internal Server Error') {
-    return {
-      success: false,
-      message,
-      statusCode: 500
-    };
+    return this.error(message, 403);
   }
 } 
