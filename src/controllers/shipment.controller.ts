@@ -1,71 +1,169 @@
 import { Request, Response, RequestHandler } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { ApiResponse } from '../utils/response';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const prisma = new PrismaClient();
 
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadDir = 'uploads/packages';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'package-' + uniqueSuffix + path.extname(file.originalname || '.jpg'));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else if (file.originalname && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      console.log('Accepting file anyway for React Native compatibility');
+      cb(null, true);
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
+});
+
+const uploadMiddleware = upload.any();
+
 export class ShipmentController {
   static createShipment: RequestHandler = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const userId = (req as any).user.userId;
-      const {
-        packageType,
-        estimatedDeliveryDate,
-        weightGrams,
-        destinationCountry,
-        packageImageUrl,
-        lat_coordinates,
-        long_coordinates
-      } = req.body;
 
-      // Validate required fields
-      if (!packageType || !estimatedDeliveryDate || !weightGrams || !destinationCountry) {
-        res.status(400).json(ApiResponse.error('Missing required fields'));
+    uploadMiddleware(req, res, async (err) => {
+      if (err) {
+        res.status(400).json(ApiResponse.error(err.message));
         return;
       }
 
-      const shipment = await prisma.shipment.create({
-        data: {
-          userId,
+      try {
+        const userId = (req as any).user?.userId;
+
+        if (!userId) {
+          res.status(401).json(ApiResponse.error('User not authenticated'));
+          return;
+        }
+
+        let packageType, estimatedDeliveryDate, weightGrams, destinationCountry, lat_coordinates, long_coordinates;
+        
+        if (req.body && req.body._parts && Array.isArray(req.body._parts)) {
+          const parsedBody: any = {};
+          
+          req.body._parts.forEach((part: any[], index: number) => {
+            if (Array.isArray(part) && part.length === 2) {
+              const [key, value] = part;
+              if (key !== 'packageImage') { 
+                parsedBody[key] = value;
+              }
+            }
+          });
+          
+          packageType = parsedBody.packageType;
+          estimatedDeliveryDate = parsedBody.estimatedDeliveryDate;
+          weightGrams = parsedBody.weightGrams;
+          destinationCountry = parsedBody.destinationCountry;
+          lat_coordinates = parsedBody.lat_coordinates;
+          long_coordinates = parsedBody.long_coordinates;
+        } else {
+          ({
+            packageType,
+            estimatedDeliveryDate,
+            weightGrams,
+            destinationCountry,
+            lat_coordinates,
+            long_coordinates
+          } = req.body);
+        }
+
+        const weightInGrams = weightGrams ? parseInt(weightGrams.toString(), 10) : null;
+
+        const missingFields = [];
+        if (!packageType) missingFields.push('packageType');
+        if (!estimatedDeliveryDate) missingFields.push('estimatedDeliveryDate');
+        if (!weightInGrams) missingFields.push('weightGrams');
+        if (!destinationCountry) missingFields.push('destinationCountry');
+
+        if (missingFields.length > 0) {
+          res.status(400).json(ApiResponse.error(`Missing required fields: ${missingFields.join(', ')}`));
+          return;
+        }
+
+        const lat = lat_coordinates ? lat_coordinates.toString() : null;
+        const lng = long_coordinates ? long_coordinates.toString() : null;
+
+        let packageImageUrl = null;
+        
+        if (req.file) {
+          packageImageUrl = `/uploads/packages/${req.file.filename}`;
+        } else if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+          const imageFile = req.files.find(file => 
+            file.fieldname === 'packageImage' || 
+            file.originalname?.includes('image') ||
+            file.mimetype?.startsWith('image/')
+          );
+          if (imageFile) {
+            packageImageUrl = `/uploads/packages/${imageFile.filename}`;
+          }
+        }
+
+        const shipmentData = {
           packageType,
           estimatedDeliveryDate: new Date(estimatedDeliveryDate),
-          weightGrams,
+          weightGrams: weightInGrams as number, 
           destinationCountry,
           packageImageUrl,
-          lat_coordinates,
-          long_coordinates
-        }
-      });
-
-      // Find matching travellers
-      const matchingTrips = await prisma.trip.findMany({
-        where: {
-          toCountry: destinationCountry,
-          status: 'ACCEPTING',
-          departureDate: {
-            gte: new Date()
-          }
-        },
-        include: {
+          lat_coordinates: lat,
+          long_coordinates: lng,
           user: {
-            select: {
-              id: true,
-              username: true,
-              email: true,
-              mobileNumber: true
+            connect: { id: userId }
+          }
+        };
+
+        const shipment = await prisma.shipment.create({
+          data: shipmentData
+        });
+
+        const matchingTrips = await prisma.trip.findMany({
+          where: {
+            toCountry: destinationCountry,
+            status: 'ACCEPTING',
+            departureDate: {
+              gte: new Date()
+            }
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                mobileNumber: true
+              }
             }
           }
-        }
-      });
+        });
 
-      res.json(ApiResponse.success({
-        shipment,
-        matchingTravellers: matchingTrips
-      }));
-    } catch (error) {
-      console.error('Create shipment error:', error);
-      res.status(500).json(ApiResponse.serverError());
-    }
+        res.json(ApiResponse.success({
+          shipment,
+          matchingTravellers: matchingTrips
+        }));
+      } catch (error) {
+        res.status(500).json(ApiResponse.serverError());
+      }
+    });
   }
 
   static getShipments: RequestHandler = async (req: Request, res: Response): Promise<void> => {
@@ -78,7 +176,6 @@ export class ShipmentController {
 
       res.json(ApiResponse.success(shipments));
     } catch (error) {
-      console.error('Get shipments error:', error);
       res.status(500).json(ApiResponse.serverError());
     }
   }
@@ -100,7 +197,6 @@ export class ShipmentController {
         return;
       }
 
-      // Get matching travellers for this shipment
       const matchingTrips = await prisma.trip.findMany({
         where: {
           toCountry: shipment.destinationCountry,
@@ -126,8 +222,7 @@ export class ShipmentController {
         matchingTravellers: matchingTrips
       }));
     } catch (error) {
-      console.error('Get shipment details error:', error);
       res.status(500).json(ApiResponse.serverError());
     }
   }
-} 
+}

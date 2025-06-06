@@ -23,7 +23,7 @@ export class UserController {
       const { mobileNumber, password } = req.body;
 
       const user = await prisma.user.findUnique({
-        where: { mobileNumber }
+        where: { mobileNumber, isVerified: true }
       });
 
       if (!user) {
