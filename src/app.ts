@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import userRoutes from './routes/user.routes';
 import shipmentRoutes from './routes/shipment.routes';
+import tripRoutes from './routes/trip.routes';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/trips', tripRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
