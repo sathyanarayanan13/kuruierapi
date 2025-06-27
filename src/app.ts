@@ -2,15 +2,32 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import userRoutes from './routes/user.routes';
 import shipmentRoutes from './routes/shipment.routes';
 import tripRoutes from './routes/trip.routes';
 import chatRoutes from './routes/chat.routes';
 import paymentRoutes from './routes/payment.routes';
+import { WebSocketService } from './services/websocket.service';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+
+// Initialize Socket.IO with CORS configuration
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Configure this properly for production
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
+});
+
+// Initialize WebSocket service
+WebSocketService.initialize(io);
 
 // Middleware
 app.use(cors());
@@ -39,8 +56,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`WebSocket server initialized`);
 });
 
 export default app;

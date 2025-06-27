@@ -4,6 +4,7 @@ import { ApiResponse } from '../utils/response';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { WebSocketService } from '../services/websocket.service';
 
 const prisma = new PrismaClient();
 
@@ -248,6 +249,9 @@ export class ChatController {
           }
         });
 
+        // Broadcast the new message to all participants in real-time
+        WebSocketService.broadcastNewMessage(matchId, message);
+
         res.json(ApiResponse.success(message));
       } catch (error) {
         res.status(500).json(ApiResponse.serverError());
@@ -377,6 +381,9 @@ export class ChatController {
           unlockedAt: new Date()
         }
       });
+
+      // Broadcast chat unlocked event to all participants
+      WebSocketService.broadcastChatUnlocked(matchId, new Date());
 
       res.json(ApiResponse.success({
         payment,
