@@ -21,6 +21,13 @@ model User {
   roleHistory      UserRoleHistory[]
   shipments        Shipment[]
   trips            Trip[]
+  
+  // Chat related relations
+  sentMessages     Chat[]            @relation("MessageSender")
+  chatParticipants ChatParticipant[]
+  chatPayments     ChatPayment[]
+  sentInvitations  ChatInvitation[]  @relation("InvitationSender")
+  receivedInvitations ChatInvitation[] @relation("InvitationReceiver")
 }
 
 model OtpVerification {
@@ -55,6 +62,11 @@ model Shipment {
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
   user                  User           @relation(fields: [userId], references: [id])
+  
+  // Chat related relations
+  travelMatches         ShipmentTravelMatch[]
+  chatAccess            ShipmentChatAccess[]
+  chatPayments          ChatPayment[]
 }
 
 model Trip {
@@ -71,6 +83,112 @@ model Trip {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   user             User       @relation(fields: [userId], references: [id])
+  
+  // Chat related relations
+  shipmentMatches  ShipmentTravelMatch[]
+  chatAccess       ShipmentChatAccess[]
+}
+
+// New models for chat system
+model ShipmentTravelMatch {
+  id          String   @id @default(uuid())
+  shipmentId  String
+  tripId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  shipment    Shipment @relation(fields: [shipmentId], references: [id])
+  trip        Trip     @relation(fields: [tripId], references: [id])
+  
+  // Chat related relations
+  chatAccess     ShipmentChatAccess[]
+  chats          Chat[]
+  chatParticipants ChatParticipant[]
+  chatPayments   ChatPayment[]
+  chatInvitations ChatInvitation[]
+  
+  @@unique([shipmentId, tripId])
+}
+
+model ShipmentChatAccess {
+  id                String   @id @default(uuid())
+  shipmentId        String
+  tripId            String
+  matchId           String
+  isBonus           Boolean  @default(false)
+  unlockedByPayment Boolean  @default(false)
+  unlockedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  shipment          Shipment            @relation(fields: [shipmentId], references: [id])
+  trip              Trip                @relation(fields: [tripId], references: [id])
+  match             ShipmentTravelMatch @relation(fields: [matchId], references: [id])
+  
+  @@unique([matchId])
+}
+
+model ChatPayment {
+  id                    String        @id @default(uuid())
+  userId                String
+  shipmentId            String
+  matchId               String
+  amount                Decimal       @db.Decimal(10, 2)
+  paymentStatus         PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?       @unique
+  confirmedAt           DateTime?
+  createdAt             DateTime      @default(now())
+  
+  user          User                @relation(fields: [userId], references: [id])
+  shipment      Shipment            @relation(fields: [shipmentId], references: [id])
+  match         ShipmentTravelMatch @relation(fields: [matchId], references: [id])
+}
+
+model Chat {
+  id             String      @id @default(uuid())
+  matchId        String
+  senderId       String
+  messageType    MessageType @default(TEXT)
+  messageContent String
+  fileUrl        String?
+  fileName       String?
+  fileSize       Int?
+  isPredefined   Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  
+  match          ShipmentTravelMatch @relation(fields: [matchId], references: [id])
+  sender         User                @relation("MessageSender", fields: [senderId], references: [id])
+  
+  @@index([matchId])
+  @@index([senderId])
+}
+
+model ChatParticipant {
+  id         String   @id @default(uuid())
+  matchId    String
+  userId     String
+  roleInChat ChatRole
+  joinedAt   DateTime @default(now())
+  
+  match      ShipmentTravelMatch @relation(fields: [matchId], references: [id])
+  user       User                @relation(fields: [userId], references: [id])
+  
+}
+
+model ChatInvitation {
+  id          String           @id @default(uuid())
+  matchId     String
+  inviterId   String
+  inviteeId   String
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+  
+  match       ShipmentTravelMatch @relation(fields: [matchId], references: [id])
+  inviter     User                @relation("InvitationSender", fields: [inviterId], references: [id])
+  invitee     User                @relation("InvitationReceiver", fields: [inviteeId], references: [id])
+  
+  @@unique([matchId, inviteeId])
 }
 
 enum UserRole {
@@ -96,4 +214,29 @@ enum ShipmentStatus {
 enum TripStatus {
   ACCEPTING
   MAYBE_LATER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE_NOTE
+}
+
+enum ChatRole {
+  SHIPMENT_OWNER
+  SENDER
+  RECEIVER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }

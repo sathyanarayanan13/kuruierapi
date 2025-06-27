@@ -57,13 +57,16 @@ export class TripController {
         data: tripData
       });
 
-      // Find matching shipments for this trip
+      // Find matching shipments for this trip (exclude current user's shipments)
       const matchingShipments = await prisma.shipment.findMany({
         where: {
           destinationCountry: toCountry,
           status: 'PENDING',
           estimatedDeliveryDate: {
             lte: new Date(departureDate)
+          },
+          userId: {
+            not: userId // Exclude current user's shipments
           }
         },
         include: {
@@ -90,9 +93,30 @@ export class TripController {
   static getTrips: RequestHandler = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user.userId;
+      
+      // Get all trips excluding current user's trips
+      // This allows users to see available trips from other travelers
       const trips = await prisma.trip.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' }
+        where: { 
+          userId: {
+            not: userId // Exclude current user's trips
+          },
+          status: 'ACCEPTING', // Only show trips that are accepting packages
+          departureDate: {
+            gte: new Date() // Only show future trips
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              mobileNumber: true
+            }
+          }
+        },
+        orderBy: { departureDate: 'asc' } // Show nearest departure dates first
       });
 
       res.json(ApiResponse.success(trips));
@@ -109,22 +133,37 @@ export class TripController {
       const trip = await prisma.trip.findFirst({
         where: {
           id: tripId,
-          userId
+          userId: {
+            not: userId // Allow viewing other users' trip details
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              mobileNumber: true
+            }
+          }
         }
       });
 
       if (!trip) {
-        res.status(404).json(ApiResponse.notFound('Trip not found'));
+        res.status(404).json(ApiResponse.notFound('Trip not found or access denied'));
         return;
       }
 
-      // Find matching shipments for this trip
+      // Find matching shipments for this trip (exclude current user's shipments)
       const matchingShipments = await prisma.shipment.findMany({
         where: {
           destinationCountry: trip.toCountry,
           status: 'PENDING',
           estimatedDeliveryDate: {
             lte: trip.departureDate
+          },
+          userId: {
+            not: userId // Exclude current user's shipments
           }
         },
         include: {
@@ -147,4 +186,20 @@ export class TripController {
       res.status(500).json(ApiResponse.serverError());
     }
   }
-} 
+
+  // New endpoint to get current user's own trips for management
+  static getMyTrips: RequestHandler = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user.userId;
+      
+      const myTrips = await prisma.trip.findMany({
+        where: { userId }, // Only current user's trips
+        orderBy: { createdAt: 'desc' }
+      });
+
+      res.json(ApiResponse.success(myTrips));
+    } catch (error) {
+      res.status(500).json(ApiResponse.serverError());
+    }
+  }
+}

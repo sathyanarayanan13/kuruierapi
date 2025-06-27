@@ -5,6 +5,8 @@ import path from 'path';
 import userRoutes from './routes/user.routes';
 import shipmentRoutes from './routes/shipment.routes';
 import tripRoutes from './routes/trip.routes';
+import chatRoutes from './routes/chat.routes';
+import paymentRoutes from './routes/payment.routes';
 
 dotenv.config();
 
@@ -22,6 +24,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/users', userRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -39,4 +43,4 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-export default app; 
+export default app;

@@ -7,10 +7,13 @@ const router = Router();
 // Create a new trip
 router.post('/v1', authMiddleware, TripController.createTrip);
 
-// Get all trips for the authenticated user
+// Get all trips excluding current user's trips (for shipment owners to browse)
 router.get('/v1', authMiddleware, TripController.getTrips);
 
-// Get specific trip details
+// Get current user's own trips for management
+router.get('/v1/my-trips', authMiddleware, TripController.getMyTrips);
+
+// Get specific trip details (from other users)
 router.get('/v1/:tripId', authMiddleware, TripController.getTripDetails);
 
-export default router; 
+export default router;
