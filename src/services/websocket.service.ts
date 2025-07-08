@@ -380,4 +380,8 @@ export class WebSocketService {
     const chatRoom = this.chatRooms.get(matchId);
     return chatRoom ? chatRoom.participants : [];
   }
+
+  static getUserIdsInChat(matchId: string): string[] {
+    return this.getUsersInChat(matchId).map(user => user.userId);
+  }
 }

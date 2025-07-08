@@ -8,6 +8,12 @@ import { WebSocketService } from '../services/websocket.service';
 
 const prisma = new PrismaClient();
 
+// Stub for push notification logic
+function sendPushNotification(userId: string, message: any) {
+  // TODO: Implement actual push notification logic here
+  console.log(`Push notification to user ${userId} for message ${message.id}`);
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (_req, file, cb) => {
@@ -251,6 +257,15 @@ export class ChatController {
 
         // Broadcast the new message to all participants in real-time
         WebSocketService.broadcastNewMessage(matchId, message);
+
+        // Send push notifications to users not currently in the chat
+        const allParticipants = await prisma.chatParticipant.findMany({ where: { matchId } });
+        const activeUserIds = WebSocketService.getUserIdsInChat(matchId);
+        for (const participant of allParticipants) {
+          if (participant.userId !== userId && !activeUserIds.includes(participant.userId)) {
+            sendPushNotification(participant.userId, message); // Implement this function as needed
+          }
+        }
 
         res.json(ApiResponse.success(message));
       } catch (error) {
