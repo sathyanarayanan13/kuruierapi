@@ -308,4 +308,36 @@ export class UserController {
       return res.status(500).json(ApiResponse.serverError());
     }
   }
+
+  static async getValidCounts(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.userId;
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return res.status(404).json(ApiResponse.notFound('User not found'));
+      }
+      let validPackageCount = 0;
+      let validTravelCount = 0;
+      const now = new Date();
+      if (user.currentRole === 'SHIPMENT_OWNER') {
+        validPackageCount = await prisma.shipment.count({
+          where: {
+            userId,
+            estimatedDeliveryDate: { gt: now },
+          },
+        });
+      }
+      if (user.currentRole === 'TRAVELLER') {
+        validTravelCount = await prisma.trip.count({
+          where: {
+            userId,
+            departureDate: { gt: now },
+          },
+        });
+      }
+      return res.json(ApiResponse.success({ validPackageCount, validTravelCount }));
+    } catch (error) {
+      return res.status(500).json(ApiResponse.serverError());
+    }
+  }
 } 

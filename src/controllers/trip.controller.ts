@@ -93,19 +93,28 @@ export class TripController {
   static getTrips: RequestHandler = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user.userId;
+      const { destinationCountry } = req.query;
       
+      // Build where clause
+      const whereClause: any = { 
+        userId: {
+          not: userId // Exclude current user's trips
+        },
+        //atus: 'ACCEPTING', // Only show trips that are accepting packages
+        departureDate: {
+          gte: new Date() // Only show future trips
+        }
+      };
+
+      // Add destination country filter if provided
+      if (destinationCountry) {
+        whereClause.toCountry = destinationCountry;
+      }
+
       // Get all trips excluding current user's trips
       // This allows users to see available trips from other travelers
       const trips = await prisma.trip.findMany({
-        where: { 
-          userId: {
-            not: userId // Exclude current user's trips
-          },
-          status: 'ACCEPTING', // Only show trips that are accepting packages
-          departureDate: {
-            gte: new Date() // Only show future trips
-          }
-        },
+        where: whereClause,
         include: {
           user: {
             select: {

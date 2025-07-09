@@ -177,16 +177,25 @@ export class ShipmentController {
   static getShipments: RequestHandler = async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req as any).user.userId;
+      const { destinationCountry } = req.query;
       
+      // Build where clause
+      const whereClause: any = {
+        userId: {
+          not: userId // Exclude current user's shipments
+        },
+        status: 'PENDING' // Only show pending shipments that need travelers
+      };
+
+      // Add destination country filter if provided
+      if (destinationCountry) {
+        whereClause.destinationCountry = destinationCountry;
+      }
+
       // Get all shipments excluding current user's shipments
       // This allows travelers to see available shipments from other shipment owners
       const shipments = await prisma.shipment.findMany({
-        where: { 
-          userId: {
-            not: userId // Exclude current user's shipments
-          },
-          status: 'PENDING' // Only show pending shipments that need travelers
-        },
+        where: whereClause,
         include: {
           user: {
             select: {

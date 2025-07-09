@@ -23,5 +23,7 @@ router.get('/v1/profile', authMiddleware, UserController.getProfile);
 router.put('/v1/profile', authMiddleware, UserController.updateProfile);
 // @ts-ignore
 router.put('/v1/profile/mobile', authMiddleware, UserController.updateMobileNumber);
+// @ts-ignore
+router.get('/v1/valid-counts', authMiddleware, UserController.getValidCounts);
 
 export default router; 
